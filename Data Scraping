@@ -1,0 +1,73 @@
+# Scrape Data
+
+## Adult Lifetime Cannabis Use by Country
+
+target1 = 'https://en.wikipedia.org/wiki/Adult_lifetime_cannabis_use_by_country'
+
+response = BeautifulSoup(request.urlopen(target1),'html.parser')
+TAB = response.find('table', class_='wikitable sortable mw-datatable sort-under sticky-header static-row-numbers col2left col8center')
+
+rows = TAB.find_all('tr')
+
+data = []
+for row in rows:
+    row_data = []
+    for cell in row.find_all('td'):
+        row_data.append(cell.text)
+    data.append(row_data)
+
+columnNames = ['Location', 'Geographical Area', 'Year', 'Age Range', 'Males', 'Females', 'Total', 'Ref']
+
+AdultUseByCountry = pd.DataFrame(data, columns = columnNames)
+
+## Annual Cannabis Use by Country
+
+target2 = 'https://en.wikipedia.org/wiki/List_of_countries_by_annual_cannabis_use'
+
+response = BeautifulSoup(request.urlopen(target2),'html.parser')
+TAB = response.find('table', class_='wikitable sortable mw-datatable static-row-numbers sticky-header sort-under col1left col5left')
+
+# print(response)
+
+rows = TAB.find_all('tr')
+
+data = []
+for row in rows:
+    row_data = []
+    for cell in row.find_all('td'):
+        row_data.append(cell.text)
+    data.append(row_data)
+
+columnNames = ['Location', 'Annual Prevalence', 'Year', 'Age Group', 'Source Notes']
+
+AnnualUseByCountry = pd.DataFrame(data, columns = columnNames)
+
+AnnualUseByCountry = AnnualUseByCountry.drop(0)
+AnnualUseByCountry = AnnualUseByCountry.drop(columns = ['Source Notes', 'Age Group', 'Year'])
+
+countries = AnnualUseByCountry['Location']
+
+# Function to clean country names
+def clean_country_name(name):
+    # Use regex to remove any characters that are not letters or spaces
+    cleaned_name = re.sub(r'[^a-zA-Z\s]', '', name)
+    # Strip leading and trailing whitespace
+    cleaned_name = cleaned_name.strip()
+    return cleaned_name
+
+# Clean all country names in the list
+cleaned_countries = [clean_country_name(country) for country in countries]
+
+AnnualUseByCountry['Location'] = cleaned_countries
+
+selected_countries = ['United Kingdom', 'United States', 'Netherlands', 'Germany', 'Canada', 'Australia']
+filteredAnnualUseByCountry = AnnualUseByCountry[AnnualUseByCountry['Location'].isin(selected_countries)]
+filteredAnnualUseByCountry['Annual Prevalence'] = filteredAnnualUseByCountry['Annual Prevalence'].str.replace(r'[^\d.]', '', regex=True)
+filteredAnnualUseByCountry
+
+
+
+
+
+
+
