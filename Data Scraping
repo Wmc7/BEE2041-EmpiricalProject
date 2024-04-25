@@ -1,33 +1,127 @@
-# Scrape Data
+# Data Science Empirical Project
 
-## Adult Lifetime Cannabis Use by Country
+# Import required packages
+from urllib import request, error
+from bs4 import BeautifulSoup
+import pandas as pd
+import re
+import requests
+import pandas as pd
+from io import BytesIO
+import ezodf
+import matplotlib.pyplot as plt
 
-target1 = 'https://en.wikipedia.org/wiki/Adult_lifetime_cannabis_use_by_country'
+## Import data for and graph tobacco and alcohol markets
 
-response = BeautifulSoup(request.urlopen(target1),'html.parser')
-TAB = response.find('table', class_='wikitable sortable mw-datatable sort-under sticky-header static-row-numbers col2left col8center')
+# Define Function to convert all sheets in data
+def ods_to_dataframes(ods_content):
+    """Convert all sheets in an ODS file to a dictionary of DataFrames."""
+    dataframes = {}
+    doc = ezodf.opendoc(BytesIO(ods_content))
 
-rows = TAB.find_all('tr')
+    for sheet in doc.sheets:
+        # Extract data from each sheet
+        data = []
+        for row in sheet.rows():
+            data.append([cell.value for cell in row])
+        # Create a DataFrame and add it to the dictionary
+        df = pd.DataFrame(data)
+        dataframes[sheet.name] = df
 
-data = []
-for row in rows:
-    row_data = []
-    for cell in row.find_all('td'):
-        row_data.append(cell.text)
-    data.append(row_data)
+    return dataframes
 
-columnNames = ['Location', 'Geographical Area', 'Year', 'Age Range', 'Males', 'Females', 'Total', 'Ref']
+### Alcohol
 
-AdultUseByCountry = pd.DataFrame(data, columns = columnNames)
+# Load the data from the alcohol tables
+alcoholData = 'https://assets.publishing.service.gov.uk/media/65ddb022cf7eb10015f57f76/Alc_Tables_Jan_24.ods'
 
-## Annual Cannabis Use by Country
+# Fetch the file
+response = requests.get(alcoholData)
+response.raise_for_status()  # Ensure the request was successful
 
-target2 = 'https://en.wikipedia.org/wiki/List_of_countries_by_annual_cannabis_use'
+# Convert the ODS file content to DataFrames
+alcoholdfs = ods_to_dataframes(response.content)
 
-response = BeautifulSoup(request.urlopen(target2),'html.parser')
+# Select the beer and cider data
+beerCider = alcoholdfs['Beer_and_Cider']
+
+# Filter the data to yearly summaries
+DutyAlcohol = beerCider.iloc[15:40]
+DutyAlcohol.columns = DutyAlcohol.iloc[0]
+DutyAlcohol = DutyAlcohol[1:]
+DutyAlcohol.reset_index(drop=True, inplace=True)
+
+# Further filter to find the value of tax from alcohol
+AlcoholTotal = DutyAlcohol[DutyAlcohol['Table 1a. Alcohol Duty receipts from beer and cider, beer and cider production and clearances statistics by financial year'] == '2022 to 2023 [Revised]']
+AlcoholTotal = AlcoholTotal['Total Alcohol Duty receipts (pounds million)']
+AlcoholTotalTax = AlcoholTotal.loc[len(DutyAlcohol) - 1] * 1e6
+
+ ### Tobacco
+
+# Load the data from tobacco tables
+tobaccoData = 'https://assets.publishing.service.gov.uk/media/65cb445273806a0010ec773d/Tobacco_Tab_Jan_24.ods'
+
+# Fetch the file
+response = requests.get(tobaccoData)
+response.raise_for_status()  # Ensure the request was successful
+
+# Convert the ODS file content to DataFrames
+tobaccodfs = ods_to_dataframes(response.content)
+
+# Select the right table and filter to yearly summaries
+DutyTobacco = tobaccodfs['Table_1_receipts'].iloc[4:38]
+DutyTobacco.columns = DutyTobacco.iloc[0]
+DutyTobacco = DutyTobacco[1:]
+DutyTobacco.reset_index(drop=True, inplace=True)
+
+# Filter further to find the value of tax from tobacco
+TobaccoTotal = DutyTobacco[DutyTobacco['Table_1a: Tobacco receipts by financial year'] == '2022 to 2023']
+TobaccoTotal = TobaccoTotal['Overall total']
+TobaccoTotalTax = TobaccoTotal.loc[len(DutyTobacco) - 1] * 1e6
+TobaccoTotalTax
+
+# %% [markdown]
+# ### Create Dataframes
+
+# Market values of tobacco and alcohol market value
+TobaccoMarketValue = 22.6e9
+AlcoholMarketValue = 45.6e9
+
+# Create Total value of markets combined
+SumMarketValue = TobaccoMarketValue + AlcoholMarketValue
+SumTax = TobaccoTotalTax + AlcoholTotalTax
+
+# Save as dictionary
+TaxDict = {
+    'Market Value': [TobaccoMarketValue, AlcoholMarketValue, SumMarketValue],
+    'Tax Raised': [TobaccoTotalTax, AlcoholTotalTax, SumTax],
+    'Market': ['Tobacco', 'Alcohol', 'Total']
+}
+
+# Save as dataframe
+df_Taxation = pd.DataFrame(TaxDict)
+
+### Plot results
+
+fig, ax = plt.subplots()
+
+ax.bar(df_Taxation['Market'], df_Taxation['Tax Raised']/1e9, color = 'r', label = 'Tax Raised')
+ax.bar(df_Taxation['Market'], df_Taxation['Market Value']/1e9, bottom = df_Taxation['Tax Raised']/1e9, label = 'Market Value')
+
+ax.set_ylabel('Value (Billion GBP)')
+ax.set_title('Tax and Market Value of Legalised Recreational Drugs')
+ax.legend()
+
+plt.show()
+
+## Import data from wikipedia for cannabis
+
+# Isolate data to scrape
+annual_use = 'https://en.wikipedia.org/wiki/List_of_countries_by_annual_cannabis_use'
+
+# Process data and save to dataframe
+response = BeautifulSoup(request.urlopen(annual_use),'html.parser')
 TAB = response.find('table', class_='wikitable sortable mw-datatable static-row-numbers sticky-header sort-under col1left col5left')
-
-# print(response)
 
 rows = TAB.find_all('tr')
 
@@ -45,6 +139,7 @@ AnnualUseByCountry = pd.DataFrame(data, columns = columnNames)
 AnnualUseByCountry = AnnualUseByCountry.drop(0)
 AnnualUseByCountry = AnnualUseByCountry.drop(columns = ['Source Notes', 'Age Group', 'Year'])
 
+# Sample list of country names with additional unwanted characters
 countries = AnnualUseByCountry['Location']
 
 # Function to clean country names
@@ -60,14 +155,161 @@ cleaned_countries = [clean_country_name(country) for country in countries]
 
 AnnualUseByCountry['Location'] = cleaned_countries
 
-selected_countries = ['United Kingdom', 'United States', 'Netherlands', 'Germany', 'Canada', 'Australia']
+# Filter data to countries for report
+selected_countries = ['United Kingdom', 'Netherlands', 'Canada', 'Australia', 'Uruguay']
 filteredAnnualUseByCountry = AnnualUseByCountry[AnnualUseByCountry['Location'].isin(selected_countries)]
 filteredAnnualUseByCountry['Annual Prevalence'] = filteredAnnualUseByCountry['Annual Prevalence'].str.replace(r'[^\d.]', '', regex=True)
-filteredAnnualUseByCountry
+filteredAnnualUseByCountry = filteredAnnualUseByCountry.reset_index().drop(columns='index')
+
+## Set market values
 
 
+# Set market value
+marketValue = {
+    "Australia":1442 * 1e6,
+    "Canada":3322 * 1e6,
+    "Netherlands": 99.47 * 1e6,
+    "United Kingdom":2.6 * 1e9,
+    "Uruguay": 42.77 * 1e6
+}
 
+# Save to dataframe
+marketValueDf = pd.DataFrame({'Country': list(marketValue.keys()), 'Value (GBP)': list(marketValue.values())})
 
+## Scrape population data
 
+# Set target
+population_data = 'https://en.wikipedia.org/wiki/List_of_countries_and_dependencies_by_population'
 
+response = BeautifulSoup(request.urlopen(population_data),'html.parser')
+TAB = response.find('table', class_='wikitable sortable sticky-header sort-under mw-datatable col2left col6left')
 
+# Process data and store to dataframe
+
+rows = TAB.find_all('tr')
+
+data = []
+for row in rows:
+    row_data = []
+    for cell in row.find_all('td'):
+        row_data.append(cell.text)
+    data.append(row_data)
+
+columnNames = ['Index Store','Country', 'Population', '% of World', 'Date', 'Source', 'Source Notes']
+
+PopByCountry = pd.DataFrame(data, columns = columnNames)
+
+# Filter data
+PopByCountry = PopByCountry.drop(0)
+PopByCountry = PopByCountry.drop(columns = ['Index Store','Source Notes', 'Source', 'Date', '% of World'])
+
+# Sample list of country names with additional unwanted characters
+countries = PopByCountry['Country']
+
+# Clean all country names in the list
+cleaned_countries = [clean_country_name(country) for country in countries]
+
+PopByCountry['Country'] = cleaned_countries
+
+# Filter data further
+filterPopByCountry = PopByCountry[PopByCountry['Country'].isin(selected_countries)]
+filterPopByCountry['Population'] = filterPopByCountry['Population'].str.replace(r'[^\d.]', '', regex=True)
+filterPopByCountry = filterPopByCountry.reset_index().drop(columns = ['index'])
+
+## Merge dataframes to allow for analysis
+
+# Merge dataframes 
+filteredAnnualUseByCountry = pd.merge(filteredAnnualUseByCountry, marketValueDf, left_on = 'Location', right_on = 'Country').drop(columns= 'Country')
+filteredAnnualUseByCountry = pd.merge(filteredAnnualUseByCountry, filterPopByCountry, left_on = 'Location', right_on = 'Country').drop(columns= 'Country')
+
+# Sort values
+filteredAnnualUseByCountry = filteredAnnualUseByCountry.sort_values(by = ['Annual Prevalence'])
+
+# Convert values to numeric
+filteredAnnualUseByCountry['Annual Prevalence'] = pd.to_numeric(filteredAnnualUseByCountry['Annual Prevalence'])
+filteredAnnualUseByCountry['Population'] = pd.to_numeric(filteredAnnualUseByCountry['Population'])
+
+# Create new columns
+filteredAnnualUseByCountry['Annual Users'] = filteredAnnualUseByCountry['Population'] * filteredAnnualUseByCountry['Annual Prevalence']/100
+filteredAnnualUseByCountry['Value Per User'] = filteredAnnualUseByCountry['Value (GBP)']/filteredAnnualUseByCountry['Annual Users']
+
+## Plot Market values
+
+# Plot graphs
+fig, ax = plt.subplots()
+
+ax.bar(filteredAnnualUseByCountry['Location'], filteredAnnualUseByCountry['Value (GBP)'])
+
+ax.set_ylabel('Market Value (Billion GBP)')
+ax.set_title('Annual Cannabis Market Value by Country')
+
+plt.show()
+
+## Plot Spend per person
+
+# Plot graphs
+fig, ax = plt.subplots()
+
+ax.bar(filteredAnnualUseByCountry['Location'], filteredAnnualUseByCountry['Value Per User'])
+
+ax.set_ylabel('Annual Cannabis Spend per User (USD)')
+ax.set_title('Annual Cannabis Spend Per Person by Country')
+
+plt.show()
+
+## Calculate potential future scenarios
+
+# Filter data to UK
+filteredAnnualUseByCountry.iloc[4]
+
+# Generate scenarios
+## Scenario 1 & 2
+
+NewPrevalence = (filteredAnnualUseByCountry['Annual Prevalence'].iloc[4] + 5, filteredAnnualUseByCountry['Annual Prevalence'].iloc[4] * 2)
+ModelDataFrame = pd.DataFrame(NewPrevalence, columns = ['New Prevalence'])
+
+ModelDataFrame['New Annual Users'] = ModelDataFrame['New Prevalence']/100 * filteredAnnualUseByCountry['Population'].iloc[4]
+ModelDataFrame['New Value'] = ModelDataFrame['New Annual Users'] * filteredAnnualUseByCountry['Value Per User'].iloc[4]
+
+ModelDataFrame['Scenario'] = ['Scenario 1', 'Scenario 2']
+
+## Scenario 3 & 4
+
+scenario3and4 = pd.DataFrame(NewPrevalence, columns = ['New Prevalence'])
+scenario3and4['New Annual Users'] = scenario3and4['New Prevalence']/100 * filteredAnnualUseByCountry['Population'].iloc[4]
+scenario3and4['New Value'] = scenario3and4['New Annual Users'] * filteredAnnualUseByCountry['Value Per User'].iloc[4] * 0.9
+scenario3and4['Scenario'] = ['Scenario 3', 'Scenario 4']
+
+## Scenario 5 & 6
+
+scenario5and6 = pd.DataFrame(NewPrevalence, columns = ['New Prevalence'])
+scenario5and6['New Annual Users'] = scenario5and6['New Prevalence']/100 * filteredAnnualUseByCountry['Population'].iloc[4]
+scenario5and6['New Value'] = scenario5and6['New Annual Users'] * filteredAnnualUseByCountry['Value Per User'].iloc[4] * 0.8
+scenario5and6['Scenario'] = ['Scenario 5', 'Scenario 6']
+
+## Join all data 
+
+ModelDataFrame = pd.concat([ModelDataFrame, scenario3and4, scenario5and6])
+
+ModelDataFrame
+
+## Calculate tax profits for future scenarios
+
+# Generate estimate for tax raised in each scenario
+ModelDataFrame['Tax Raised'] = 0.3 * ModelDataFrame['New Value']
+
+# Generate future tax potential by using values seen in canada
+ModelDataFrame["Total Tax Potential"] = ModelDataFrame['Tax Raised'] / 0.06
+
+## Plot tax potential
+
+fig, ax = plt.subplots()
+
+ax.bar(ModelDataFrame['Scenario'], ModelDataFrame['Tax Raised']/1e9, color = 'r', label = 'Direct Tax')
+ax.bar(ModelDataFrame['Scenario'], ModelDataFrame['Total Tax Potential']/1e9, bottom = ModelDataFrame['Tax Raised']/1e9, label = 'Total Tax')
+
+ax.set_ylabel('Tax Raised (Billion USD)')
+ax.set_title('Projected Tax Profits after Legalisation')
+ax.legend()
+
+plt.show()
