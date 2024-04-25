@@ -1,0 +1,81 @@
+# Scrape Alcohol Table data from online governement open source document
+
+# Import required packages
+from urllib import request, error
+from bs4 import BeautifulSoup
+import pandas as pd
+import re
+import requests
+import pandas as pd
+from io import BytesIO
+import ezodf
+import matplotlib.pyplot as plt
+
+## Import data for tobacco and alcohol markets
+
+# Define Function to convert all sheets in data
+def ods_to_dataframes(ods_content):
+    """Convert all sheets in an ODS file to a dictionary of DataFrames."""
+    dataframes = {}
+    doc = ezodf.opendoc(BytesIO(ods_content))
+
+    for sheet in doc.sheets:
+        # Extract data from each sheet
+        data = []
+        for row in sheet.rows():
+            data.append([cell.value for cell in row])
+        # Create a DataFrame and add it to the dictionary
+        df = pd.DataFrame(data)
+        dataframes[sheet.name] = df
+
+    return dataframes
+
+### Alcohol
+
+# Load the data from the alcohol tables
+alcoholData = 'https://assets.publishing.service.gov.uk/media/65ddb022cf7eb10015f57f76/Alc_Tables_Jan_24.ods'
+
+# Fetch the file
+response = requests.get(alcoholData)
+response.raise_for_status()  # Ensure the request was successful
+
+# Convert the ODS file content to DataFrames
+alcoholdfs = ods_to_dataframes(response.content)
+
+# Select the beer and cider data
+beerCider = alcoholdfs['Beer_and_Cider']
+
+# Filter the data to yearly summaries
+DutyAlcohol = beerCider.iloc[15:40]
+DutyAlcohol.columns = DutyAlcohol.iloc[0]
+DutyAlcohol = DutyAlcohol[1:]
+DutyAlcohol.reset_index(drop=True, inplace=True)
+
+# Further filter to find the value of tax from alcohol
+AlcoholTotal = DutyAlcohol[DutyAlcohol['Table 1a. Alcohol Duty receipts from beer and cider, beer and cider production and clearances statistics by financial year'] == '2022 to 2023 [Revised]']
+AlcoholTotal = AlcoholTotal['Total Alcohol Duty receipts (pounds million)']
+AlcoholTotalTax = AlcoholTotal.loc[len(DutyAlcohol) - 1] * 1e6
+
+### Tobacco
+
+# Load the data from tobacco tables
+tobaccoData = 'https://assets.publishing.service.gov.uk/media/65cb445273806a0010ec773d/Tobacco_Tab_Jan_24.ods'
+
+# Fetch the file
+response = requests.get(tobaccoData)
+response.raise_for_status()  # Ensure the request was successful
+
+# Convert the ODS file content to DataFrames
+tobaccodfs = ods_to_dataframes(response.content)
+
+# Select the right table and filter to yearly summaries
+DutyTobacco = tobaccodfs['Table_1_receipts'].iloc[4:38]
+DutyTobacco.columns = DutyTobacco.iloc[0]
+DutyTobacco = DutyTobacco[1:]
+DutyTobacco.reset_index(drop=True, inplace=True)
+
+# Filter further to find the value of tax from tobacco
+TobaccoTotal = DutyTobacco[DutyTobacco['Table_1a: Tobacco receipts by financial year'] == '2022 to 2023']
+TobaccoTotal = TobaccoTotal['Overall total']
+TobaccoTotalTax = TobaccoTotal.loc[len(DutyTobacco) - 1] * 1e6
+TobaccoTotalTax
