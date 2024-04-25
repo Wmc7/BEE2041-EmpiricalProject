@@ -79,3 +79,23 @@ TobaccoTotal = DutyTobacco[DutyTobacco['Table_1a: Tobacco receipts by financial 
 TobaccoTotal = TobaccoTotal['Overall total']
 TobaccoTotalTax = TobaccoTotal.loc[len(DutyTobacco) - 1] * 1e6
 TobaccoTotalTax
+
+### Create Dataframes
+
+# Market values of tobacco and alcohol market value
+TobaccoMarketValue = 22.6e9
+AlcoholMarketValue = 45.6e9
+
+# Create Total value of markets combined
+SumMarketValue = TobaccoMarketValue + AlcoholMarketValue
+SumTax = TobaccoTotalTax + AlcoholTotalTax
+
+# Save as dictionary
+TaxDict = {
+    'Market Value': [TobaccoMarketValue, AlcoholMarketValue, SumMarketValue],
+    'Tax Raised': [TobaccoTotalTax, AlcoholTotalTax, SumTax],
+    'Market': ['Tobacco', 'Alcohol', 'Total']
+}
+
+# Save as dataframe
+df_Taxation = pd.DataFrame(TaxDict)
