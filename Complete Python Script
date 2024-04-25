@@ -56,7 +56,7 @@ AlcoholTotal = DutyAlcohol[DutyAlcohol['Table 1a. Alcohol Duty receipts from bee
 AlcoholTotal = AlcoholTotal['Total Alcohol Duty receipts (pounds million)']
 AlcoholTotalTax = AlcoholTotal.loc[len(DutyAlcohol) - 1] * 1e6
 
- ### Tobacco
+### Tobacco
 
 # Load the data from tobacco tables
 tobaccoData = 'https://assets.publishing.service.gov.uk/media/65cb445273806a0010ec773d/Tobacco_Tab_Jan_24.ods'
@@ -80,8 +80,7 @@ TobaccoTotal = TobaccoTotal['Overall total']
 TobaccoTotalTax = TobaccoTotal.loc[len(DutyTobacco) - 1] * 1e6
 TobaccoTotalTax
 
-# %% [markdown]
-# ### Create Dataframes
+### Create Dataframes
 
 # Market values of tobacco and alcohol market value
 TobaccoMarketValue = 22.6e9
@@ -313,3 +312,5 @@ ax.set_title('Projected Tax Profits after Legalisation')
 ax.legend()
 
 plt.show()
+
+
