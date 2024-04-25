@@ -1,0 +1,47 @@
+## Import data from wikipedia for cannabis
+
+# Isolate data to scrape
+annual_use = 'https://en.wikipedia.org/wiki/List_of_countries_by_annual_cannabis_use'
+
+# Process data and save to dataframe
+response = BeautifulSoup(request.urlopen(annual_use),'html.parser')
+TAB = response.find('table', class_='wikitable sortable mw-datatable static-row-numbers sticky-header sort-under col1left col5left')
+
+rows = TAB.find_all('tr')
+
+data = []
+for row in rows:
+    row_data = []
+    for cell in row.find_all('td'):
+        row_data.append(cell.text)
+    data.append(row_data)
+
+columnNames = ['Location', 'Annual Prevalence', 'Year', 'Age Group', 'Source Notes']
+
+AnnualUseByCountry = pd.DataFrame(data, columns = columnNames)
+
+AnnualUseByCountry = AnnualUseByCountry.drop(0)
+AnnualUseByCountry = AnnualUseByCountry.drop(columns = ['Source Notes', 'Age Group', 'Year'])
+
+# Sample list of country names with additional unwanted characters
+countries = AnnualUseByCountry['Location']
+
+# Function to clean country names
+def clean_country_name(name):
+    # Use regex to remove any characters that are not letters or spaces
+    cleaned_name = re.sub(r'[^a-zA-Z\s]', '', name)
+    # Strip leading and trailing whitespace
+    cleaned_name = cleaned_name.strip()
+    return cleaned_name
+
+# Clean all country names in the list
+cleaned_countries = [clean_country_name(country) for country in countries]
+
+AnnualUseByCountry['Location'] = cleaned_countries
+
+# Filter data to countries for report
+selected_countries = ['United Kingdom', 'Netherlands', 'Canada', 'Australia', 'Uruguay']
+filteredAnnualUseByCountry = AnnualUseByCountry[AnnualUseByCountry['Location'].isin(selected_countries)]
+filteredAnnualUseByCountry['Annual Prevalence'] = filteredAnnualUseByCountry['Annual Prevalence'].str.replace(r'[^\d.]', '', regex=True)
+filteredAnnualUseByCountry = filteredAnnualUseByCountry.reset_index().drop(columns='index')
+
