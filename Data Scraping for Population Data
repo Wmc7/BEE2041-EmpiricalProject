@@ -1,3 +1,14 @@
+# Import required packages
+from urllib import request, error
+from bs4 import BeautifulSoup
+import pandas as pd
+import re
+import requests
+import pandas as pd
+from io import BytesIO
+import ezodf
+import matplotlib.pyplot as plt
+
 ## Scrape population data
 
 # Set target
